@@ -1,19 +1,49 @@
+from decimal import Decimal
+
+from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
-ALLOW_INFINITE_SUBSCRIPTIONS = True
+class Status(models.TextChoices):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    DISABLED = "disabled"
+    CANCELLED = "cancelled"
+
+
+class SubscriptionPlan(models.Model):
+    name = models.CharField(max_length=120)
+    is_active = models.BooleanField(default=True, null=False, blank=False)
+    price_monthly = models.DecimalField(
+        max_digits=19,
+        decimal_places=4,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
 
 
 class Subscription(models.Model):
-    class Status(models.TextChoices):
-            ACTIVE = "active"
-            PAUSED = "paused"
-            DISABLED = "disabled"
-
+    plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT)
     status = models.CharField(max_length=12, choices=Status.choices)
-    current_period_end = models.DateTimeField()
+    current_period_end = models.DateTimeField(
+        null=settings.ALLOW_INFINITE_SUBSCRIPTIONS,
+        blank=settings.ALLOW_INFINITE_SUBSCRIPTIONS,
+    )
+    created_at = models.DateTimeField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="subscriptions",
+    )
 
     class Meta:
         indexes = [
             models.Index(fields=["status", "current_period_end"]),
         ]
+
+
+class SubscriptionHistory(models.Model):
+    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE)
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField()
+    status = models.CharField(max_length=12, choices=Status.choices)
