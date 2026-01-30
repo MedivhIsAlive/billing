@@ -21,15 +21,18 @@ class SubscriptionPlan(models.Model):
         validators=[MinValueValidator(Decimal("0.00"))],
     )
 
+    def __str__(self):
+        return f"{self.name} ({self.is_active=})"
+
 
 class Subscription(models.Model):
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT)
     status = models.CharField(max_length=12, choices=Status.choices)
     current_period_end = models.DateTimeField(
-        null=settings.ALLOW_INFINITE_SUBSCRIPTIONS,
-        blank=settings.ALLOW_INFINITE_SUBSCRIPTIONS,
+        null=True,
+        blank=True,
     )
-    created_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
