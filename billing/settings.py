@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import ast
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,11 +25,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-yi5_i4u*$@y4g(iamj3(3-#u=9+&__ch1=3@0l-)(v3asq6a-e"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-ALLOW_INFINITE_SUBSCRIPTIONS = True
+DEBUG = ast.literal_eval(os.environ.get("DEBUG", "True"))
+ALLOWED_HOSTS = ["*"]
 
-
-ALLOWED_HOSTS = []
+CSRF_TRUSTED_ORIGINS = ast.literal_eval(os.environ.get("CSRF_TRUSTED_ORIGINS", "[]"))
+SESSION_COOKIE_SECURE = ast.literal_eval(os.environ.get("SESSION_COOKIE_SECURE", "None"))
+CSRF_COOKIE_SECURE = ast.literal_eval(os.environ.get("CSRF_COOKIE_SECURE", "None"))
+SECURE_PROXY_SSL_HEADER = ast.literal_eval(os.environ.get("SECURE_PROXY_SSL_HEADER", "None"))
 
 
 # Application definition
@@ -40,7 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_filters",
-    "auth",
+    "accounts",
     "subscriptions",
     "payment",
 ]
@@ -130,6 +134,9 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "page_size": 100,
+    "DEFAULT_THROTTLE_CLASSES": {
+        "anon": "100/day",
+    }
 }
 
 # Default primary key field type

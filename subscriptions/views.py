@@ -1,11 +1,10 @@
-from rest_framework import viewsets, generics, filters
-from rest_framework import permissions
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import viewsets, generics, filters, permissions, throttling
 
 from django_filters.rest_framework import DjangoFilterBackend
 
 from subscriptions.models import SubscriptionPlan, Subscription
 from subscriptions.serializers import SubscriptionSerializer, SubscriptionPlanSerializer
+from billing.permissions import StrictDjangoModelPermissions
 
 class SubscriptionPlanView(generics.ListAPIView):
     serializer_class = SubscriptionPlanSerializer
@@ -18,28 +17,34 @@ class SubscriptionPlanView(generics.ListAPIView):
     ]
     filterset_fields = {
         "price_monthly": ["exact", "gte", "lte",],
-        "is_active": ["exact"],
     }
 
     search_fields = ["name"]
     ordering_fields = ["price_monthly", "name", "created_at"]
+    throttle_classes = [throttling.AnonRateThrottle,]
 
     def get_queryset(self):
-        return SubscriptionPlan.objects.all()
+        return SubscriptionPlan.objects.filter(is_active=True)
 
 
 class SubscriptionViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated,]
+    serializer_class = SubscriptionSerializer
+    permission_classes = [StrictDjangoModelPermissions,]
+
+    filter_backends = [
+        DjangoFilterBackend,
+    ]
+    filterset_fields = {"status": ["exact", "in",]}
 
     def get_queryset(self):
-        return Subscription.objects.select_related("plan").order_by("-created_at")
+        return Subscription.objects.select_related("plan", "user").order_by("-created_at")
 
 
 class MySubscriptionView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated,]
+    permission_classes = [permissions.IsAuthenticated,]
     serializer_class = SubscriptionSerializer
 
     def get_queryset(self):
         return Subscription.objects.filter(
             user=self.request.user,
-        ).select_related("plan").order_by("-created_at")
+        ).select_related("plan", "user").order_by("-created_at")
