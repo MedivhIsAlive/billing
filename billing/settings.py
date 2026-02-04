@@ -12,7 +12,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import ast
 import os
+import warnings
 from pathlib import Path
+
+from __logging__ import get_logger_config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,7 +29,15 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-yi5_i4u*$@y4g(
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = ast.literal_eval(os.environ.get("DEBUG", "True"))
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", "*").split(",")
+]
+
+if not DEBUG and "*" in ALLOWED_HOSTS:
+    warnings.warn(
+        "ALLOWED_HOSTS contains '*' in production! This is a security risk",
+    )
 
 CSRF_TRUSTED_ORIGINS = ast.literal_eval(os.environ.get("CSRF_TRUSTED_ORIGINS", "[]"))
 SESSION_COOKIE_SECURE = ast.literal_eval(os.environ.get("SESSION_COOKIE_SECURE", "None"))
@@ -43,21 +54,27 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
     "django_filters",
     "accounts",
     "subscriptions",
     "payment",
     "django_extensions",
+    "request_id",
+    "django_celery_beat",
 ]
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "request_id.middleware.RequestIdMiddleware",
 ]
 
 ROOT_URLCONF = "billing.urls"
@@ -132,6 +149,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+if not DEBUG:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
 REST_FRAMEWORK = {
@@ -144,16 +164,29 @@ REST_FRAMEWORK = {
     "page_size": 100,
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/day",
-    }
+    },
+    "EXCEPTION_HANDLER": "core.exceptions.drf_exception_handler",
 }
 
-# Stripe
+# OpenAPI Settings
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Billing & Subscription API",
+    "DESCRIPTION": "Billing system with Stripe",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+}
+
+# Stripe (Get from https://dashboard.stripe.com/test/apikeys)
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 # Celery
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND")
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+LOGGING = get_logger_config()
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

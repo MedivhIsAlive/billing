@@ -10,3 +10,5 @@ class InvoiceStatus(models.TextChoices):
 class Invoice(models.Model):
     state = FSMField(default="new")
 
+    PAID = "PAID", "Paid"
+    PAID = "PAID", "Paid"
