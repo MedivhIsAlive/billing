@@ -1,20 +1,47 @@
+app_name := "billing"
+
 default:
-    @just --list
+    @just --justfile /app/app.justfile --list
 
-compose-up:
-    docker compose up -d
+dev:
+    python manage.py runserver 0.0.0.0:8000
 
-compose-up-build:
-    docker compose up -d --build
+# run celery worker locally
+celery-worker:
+    celery -A {{app_name}} worker -l info
 
-compose-down:
-    docker compose down
+# run celery beat locally
+celery-beat:
+    celery -A {{app_name}} beat -l info
+
+security-check:
+    bandit -r {{app_name}}
+    python manage.py check --deploy
+
+serve:
+    gunicorn {{app_name}}.wsgi:application \
+        --bind 0.0.0.0:8000 \
+        --workers 4 \
+        --timeout 120 \
+        --access-logfile - \
+        --error-logfile -
+
+serve-asgi:
+    uvicorn {{app_name}}.asgi.application \
+        --host 0.0.0.0 \
+        --port 8000 \
+        --workers 4
+
 
 migrate:
-    docker compose exec web python manage.py migrate
+    python manage.py migrate
 
 test:
-    docker compose exec web python manage.py test
+    python manage.py test
 
-prune-docker:
-    docker system prune -f
+# Wait for DB (useful for entrypoints)
+wait-for-db:
+    while ! nc -z db 5432; do sleep 1; done;
+
+worker-start:
+    celery -A billing worker --loglevel=info
