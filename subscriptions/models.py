@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -9,7 +10,7 @@ class Status(models.TextChoices):
     ACTIVE = "active"
     PAUSED = "paused"
     DISABLED = "disabled"
-    CANCELLED = "cancelled"
+    CANCELED = "canceled"
 
 
 class SubscriptionPlan(models.Model):
@@ -26,6 +27,9 @@ class SubscriptionPlan(models.Model):
 
 
 class Subscription(models.Model):
+    id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False,
+    )
     plan = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT)
     status = models.CharField(max_length=12, choices=Status.choices)
     current_period_end = models.DateTimeField(

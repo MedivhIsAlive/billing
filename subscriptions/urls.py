@@ -3,12 +3,14 @@ from rest_framework.routers import DefaultRouter
 from subscriptions.views import SubscriptionViewSet, MySubscriptionView, SubscriptionPlanView
 
 
+app_name = "subscriptions"
 router = DefaultRouter()
-router.register(r"subscriptions", SubscriptionViewSet, basename="subscription")
+router.include_root_view = False
+router.register(r"", SubscriptionViewSet, basename="subscription")
 
 
 urlpatterns = [
-    path("subscriptions/me/", MySubscriptionView.as_view(), name="subscriptions-me"),
-    path("plans", SubscriptionPlanView.as_view(), name="subscription-plans"),
+    path("me/", MySubscriptionView.as_view(), name="me"),
+    path("plans", SubscriptionPlanView.as_view(), name="plans"),
     path("", include(router.urls))
 ]
