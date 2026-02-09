@@ -1,6 +1,7 @@
 import logging
 from rest_framework.views import exception_handler
 
+
 logger = logging.getLogger("drf.exceptions")
 
 

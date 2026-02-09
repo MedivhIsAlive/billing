@@ -1,30 +1,10 @@
-from rest_framework import viewsets, generics, filters, permissions, throttling
+from rest_framework import viewsets, generics, permissions
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from subscriptions.models import SubscriptionPlan, Subscription
-from subscriptions.serializers import SubscriptionSerializer, SubscriptionPlanSerializer
+from subscriptions.models import Subscription
+from subscriptions.serializers import SubscriptionSerializer
 from billing.permissions import StrictDjangoModelPermissions
-
-class SubscriptionPlanView(generics.ListAPIView):
-    serializer_class = SubscriptionPlanSerializer
-    permission_classes = [permissions.AllowAny,]
-
-    filter_backends = [
-        DjangoFilterBackend,
-        filters.SearchFilter,
-        filters.OrderingFilter,
-    ]
-    filterset_fields = {
-        "price_monthly": ["exact", "gte", "lte",],
-    }
-
-    search_fields = ["name"]
-    ordering_fields = ["price_monthly", "name", "created_at"]
-    throttle_classes = [throttling.AnonRateThrottle,]
-
-    def get_queryset(self):
-        return SubscriptionPlan.objects.filter(is_active=True)
 
 
 class SubscriptionViewSet(viewsets.ModelViewSet):

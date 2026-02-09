@@ -13,9 +13,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import ast
 import os
 import warnings
+import stripe
+
 from pathlib import Path
 
 from __logging__ import get_logger_config
+from dotenv import load_dotenv
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -45,7 +49,6 @@ CSRF_COOKIE_SECURE = ast.literal_eval(os.environ.get("CSRF_COOKIE_SECURE", "None
 SECURE_PROXY_SSL_HEADER = ast.literal_eval(os.environ.get("SECURE_PROXY_SSL_HEADER", "None"))
 
 
-# Application definition
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -56,12 +59,14 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "django_filters",
-    "accounts",
-    "subscriptions",
-    "payment",
     "django_extensions",
     "request_id",
     "django_celery_beat",
+
+    # CUSTOM DEFINED APPS
+    "accounts",
+    "subscriptions",
+    "core",
 ]
 
 
@@ -102,14 +107,14 @@ WSGI_APPLICATION = "billing.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "app_db"),
-        "USER": os.getenv("DB_USER", "app_user"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "secret"),
-        "HOST": os.getenv("DB_HOST", "db"),
-        "PORT": os.getenv("DB_PORT", "5432"),
-        # "ENGINE": "django.db.backends.sqlite3",
-        # "NAME": BASE_DIR / "db.sqlite3",
+        # "ENGINE": "django.db.backends.postgresql",
+        # "NAME": os.environ.get("DB_NAME", "app_db"),
+        # "USER": os.getenv("DB_USER", "app_user"),
+        # "PASSWORD": os.getenv("DB_PASSWORD", "secret"),
+        # "HOST": os.getenv("DB_HOST", "db"),
+        # "PORT": os.getenv("DB_PORT", "5432"),
+         "ENGINE": "django.db.backends.sqlite3",
+         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
 
@@ -177,8 +182,17 @@ SPECTACULAR_SETTINGS = {
 }
 
 # Stripe (Get from https://dashboard.stripe.com/test/apikeys)
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+else:
+    warnings.warn(
+        "No stripe secret key was provided; STRIPE might not work"
+    )
+
 
 # Celery
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL")
