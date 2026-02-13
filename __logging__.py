@@ -2,7 +2,7 @@ import os
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-# TODO: maybe do env aware logging? Like get_dev_logger, get_staging, etc
+
 def get_logger_config():
     return {
         "version": 1,

@@ -29,10 +29,16 @@ class Purchase(models.Model):
 
     product_name = models.CharField(max_length=255)
 
-    stripe_price_id = models.CharField(max_length=255, db_index=True)
-    stripe_invoice_id = models.CharField(max_length=255, unique=True, db_index=True)
+    stripe_price_id = models.CharField(max_length=255, db_index=True, blank=True, default="")
+    stripe_invoice_id = models.CharField(max_length=255, db_index=True, blank=True, default="")
+    stripe_checkout_session_id = models.CharField(max_length=255, db_index=True, blank=True, default="")
+    stripe_payment_intent_id = models.CharField(max_length=255, db_index=True, blank=True, default="")
+    stripe_charge_id = models.CharField(max_length=255, db_index=True, blank=True, default="")
+
+    dispute_reason = models.CharField(max_length=255, blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "purchases"
@@ -40,6 +46,18 @@ class Purchase(models.Model):
         indexes = [
             models.Index(fields=["customer", "created_at"]),
             models.Index(fields=["customer", "purchase_type"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["stripe_invoice_id", "stripe_price_id"],
+                condition=~models.Q(stripe_invoice_id=""),
+                name="unique_purchase_per_invoice_line",
+            ),
+            models.UniqueConstraint(
+                fields=["stripe_checkout_session_id"],
+                condition=~models.Q(stripe_checkout_session_id=""),
+                name="unique_purchase_per_checkout_session",
+            ),
         ]
 
     def __str__(self):
@@ -50,12 +68,27 @@ class Purchase(models.Model):
         return self.amount - self.amount_refunded
 
     def refund(self, amount=None):
-        refund_amount = amount or self.amount
-        self.amount_refunded += refund_amount
+        refund_amount = self.amount if amount is None else amount
 
-        if self.amount_refunded >= self.amount:
-            self.status = PurchaseStatus.REFUNDED
-        else:
-            self.status = PurchaseStatus.PARTIALLY_REFUNDED
+        updated = (
+            Purchase.objects
+            .filter(pk=self.pk)
+            .update(
+                amount_refunded=models.F("amount_refunded") + refund_amount,
+                status=models.Case(
+                    models.When(
+                        amount_refunded__gte=models.F("amount") - refund_amount,
+                        then=models.Value(PurchaseStatus.REFUNDED),
+                    ),
+                    default=models.Value(PurchaseStatus.PARTIALLY_REFUNDED),
+                ),
+            )
+        )
 
-        self.save(update_fields=["amount_refunded", "status"])
+        if updated:
+            self.refresh_from_db(fields=["amount_refunded", "status"])
+
+    def mark_disputed(self, reason: str = ""):
+        self.status = PurchaseStatus.DISPUTED
+        self.dispute_reason = reason
+        self.save(update_fields=["status", "dispute_reason", "updated_at"])

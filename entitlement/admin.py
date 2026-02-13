@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
+
 from entitlement.models import Entitlement
 
 
@@ -15,26 +16,14 @@ class EntitlementAdmin(admin.ModelAdmin):
         "expires_at",
         "created_at",
     ]
-    list_filter = [
-        "granted_by",
-        "is_active",
-        "feature",
-        "created_at",
-        "expires_at",
-    ]
+    list_filter = ["granted_by", "is_active", "feature", "created_at", "expires_at"]
     search_fields = [
         "customer__user__email",
         "customer__user__username",
         "feature",
         "revoke_reason",
     ]
-    readonly_fields = [
-        "created_at",
-        "updated_at",
-        "revoked_at",
-        "usage_count",
-        "is_valid_status",
-    ]
+    readonly_fields = ["created_at", "updated_at", "revoked_at", "usage_count", "is_valid_status"]
     raw_id_fields = ["customer"]
 
     fieldsets = (
@@ -57,28 +46,19 @@ class EntitlementAdmin(admin.ModelAdmin):
 
     @admin.display(description="Status")
     def status_badge(self, obj):
-        # thanks to chatgpt for icons; i like them tbh
+        # Thanks to chatgpt for icons, although i like them so i kept them
         if obj.is_valid:
-            color = "green"
-            text = "✓ Valid"
+            color, text = "green", "✓ Valid"
         elif not obj.is_active:
-            color = "red"
-            text = "✗ Revoked"
+            color, text = "red", "✗ Revoked"
         elif obj.expires_at and timezone.now() > obj.expires_at:
-            color = "orange"
-            text = "⏱ Expired"
+            color, text = "orange", "⏱ Expired"
         elif obj.usage_limit and obj.usage_count >= obj.usage_limit:
-            color = "orange"
-            text = "⚠ Limit Reached"
+            color, text = "orange", "⚠ Limit Reached"
         else:
-            color = "gray"
-            text = "? Unknown"
+            color, text = "gray", "? Unknown"
 
-        return format_html(
-            '<span style="color: {}; font-weight: bold;">{}</span>',
-            color,
-            text
-        )
+        return format_html('<span style="color: {}; font-weight: bold;">{}</span>', color, text)
 
     @admin.display(description="Usage")
     def usage_display(self, obj):
@@ -93,10 +73,10 @@ class EntitlementAdmin(admin.ModelAdmin):
 
     @admin.action(description="Revoke selected entitlements")
     def revoke_selected(self, request, queryset):
-        count = 0
-        for entitlement in queryset:
-            entitlement.revoke(reason="Admin revocation")
-            count += 1
+        # TODO: test this, not sure what manager this qs has, maybe revoke_all is not accessible
+        count = queryset.count()
+        if count:
+            queryset.revoke_all()
         self.message_user(request, f"Revoked {count} entitlement(s).")
 
     @admin.action(description="Activate selected entitlements")

@@ -3,7 +3,6 @@ from django.db import models
 
 
 class Customer(models.Model):
-    # you if you wanna add b2b, all you have to do is swap 121 with foreign key and add org model
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="customer")
 
     stripe_customer_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)

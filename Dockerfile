@@ -40,5 +40,4 @@ USER appuser
 
 EXPOSE 8000
 
-# TODO: some way to serve static maybe? IDK its a pet project why in the world would i need nginx here
 CMD ["just", "serve"]

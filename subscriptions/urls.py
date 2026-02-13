@@ -10,6 +10,6 @@ router.register(r"", SubscriptionViewSet, basename="subscription")
 
 
 urlpatterns = [
-    path("me/", MySubscriptionView.as_view(), name="me"),
-    path("", include(router.urls))
+    path("me/", MySubscriptionView.as_view(), name="my-subscriptions"),
+    path("", include(router.urls)),
 ]

@@ -1,5 +1,4 @@
 from django.apps import AppConfig
-from django.utils.module_loading import autodiscover_modules
 
 
 class CoreConfig(AppConfig):
@@ -7,4 +6,9 @@ class CoreConfig(AppConfig):
     name = "core"
 
     def ready(self):
-        autodiscover_modules("stripe.stripe_handlers")
+        # Explicit imports — each one registers handlers via __init_subclass__.
+        # 4 lines is a feature, not boilerplate. If any import fails,
+        # the app crashes at startup, not at 3am when a webhook arrives.
+        import subscriptions.stripe_handlers  # noqa: F401
+        import purchases.stripe_handlers      # noqa: F401
+        import accounts.stripe_handlers       # noqa: F401

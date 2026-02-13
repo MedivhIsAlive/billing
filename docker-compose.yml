@@ -15,6 +15,15 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build: .
+    command: python manage.py migrate
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+
   redis:
     image: redis:7-alpine
     ports:
@@ -51,6 +60,8 @@ services:
     env_file:
       - .env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
@@ -66,6 +77,8 @@ services:
     env_file:
       - .env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
@@ -81,6 +94,8 @@ services:
     env_file:
       - .env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:

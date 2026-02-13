@@ -2,14 +2,10 @@ from rest_framework import serializers
 
 
 class CheckoutRequestSerializer(serializers.Serializer):
-    price_id = serializers.CharField(help_text="Stripe Price ID")
+    price_id = serializers.CharField()
     quantity = serializers.IntegerField(default=1, required=False)
-    mode = serializers.ChoiceField(
-        choices=["subscription", "payment"],
-        required=False,
-        help_text="Payment mode. Inferred from price if not provided.",
-    )
-    idempotency_key = serializers.CharField(required=False, help_text="Unique key to prevent duplicate sessions")
+    mode = serializers.ChoiceField(choices=["subscription", "payment"], required=False)
+    idempotency_key = serializers.CharField(required=False)
 
 
 class CheckoutResponseSerializer(serializers.Serializer):
@@ -46,7 +42,7 @@ class PurchaseHistoryResponseSerializer(serializers.Serializer):
 
 class PriceSerializer(serializers.Serializer):
     id = serializers.CharField()
-    amount = serializers.IntegerField(help_text="Amount in cents")
+    amount = serializers.IntegerField()
     currency = serializers.CharField()
     interval = serializers.CharField(allow_null=True)
 

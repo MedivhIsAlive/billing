@@ -22,16 +22,22 @@ class EntitlementQuerySet(models.QuerySet):
         )
 
     def revoke_all(self, reason=""):
-        return self.update(is_active=False, revoked_at=timezone.now(), revoke_reason=reason)
+        now = timezone.now()
+        return self.update(is_active=False, revoked_at=now, revoke_reason=reason)
 
 
 class Entitlement(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="entitlements")
 
-    feature = models.CharField(
-        max_length=100, db_index=True, help_text="Feature key: 'pro', 'api_access', 'priority_support', etc."
+    subscription = models.ForeignKey(
+        "subscriptions.Subscription",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="entitlements",
     )
 
+    feature = models.CharField(max_length=100, db_index=True)
     granted_by = models.CharField(max_length=20, choices=GrantedBy.choices, default=GrantedBy.SUBSCRIPTION)
 
     expires_at = models.DateTimeField(null=True, blank=True, db_index=True, default=None)
@@ -40,9 +46,7 @@ class Entitlement(models.Model):
     revoked_at = models.DateTimeField(null=True, blank=True)
     revoke_reason = models.CharField(max_length=255, blank=True)
 
-    usage_limit = models.PositiveIntegerField(
-        null=True, blank=True, default=None, help_text="Max usage count. Null = unlimited."
-    )
+    usage_limit = models.PositiveIntegerField(null=True, blank=True, default=None)
     usage_count = models.PositiveIntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -57,7 +61,8 @@ class Entitlement(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["customer", "feature", "subscription"], name="unique_entitlement_per_subscription"
+                fields=["customer", "feature", "subscription"],
+                name="unique_entitlement_per_subscription",
             )
         ]
 
@@ -69,13 +74,10 @@ class Entitlement(models.Model):
     def is_valid(self) -> bool:
         if not self.is_active:
             return False
-
         if self.expires_at and timezone.now() > self.expires_at:
             return False
-
         if self.usage_limit and self.usage_count >= self.usage_limit:
             return False
-
         return True
 
     def revoke(self, reason: str = "") -> None:
@@ -85,9 +87,9 @@ class Entitlement(models.Model):
         self.save(update_fields=["is_active", "revoked_at", "revoke_reason", "updated_at"])
 
     def increment_usage(self) -> bool:
-        if self.usage_limit and self.usage_count >= self.usage_limit:
-            return False
-
-        self.usage_count = models.F("usage_count") + 1
-        self.save(update_fields=["usage_count", "updated_at"])
-        return True
+        updated = (
+            Entitlement.objects.filter(pk=self.pk, is_active=True)
+            .filter(models.Q(usage_limit__isnull=True) | models.Q(usage_count__lt=models.F("usage_limit")))
+            .update(usage_count=models.F("usage_count") + 1)
+        )
+        return updated > 0

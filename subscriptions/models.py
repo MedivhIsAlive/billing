@@ -1,4 +1,9 @@
+from hmac import new
+import logging
 from django.db import models
+from django.utils import timezone
+
+log = logging.getLogger("billing.subscriptions")
 
 
 class SubscriptionStatus(models.TextChoices):
@@ -12,12 +17,30 @@ class SubscriptionStatus(models.TextChoices):
     PAUSED = "paused", "Paused"
 
 
+EXPECTED_TRANSITIONS: dict[str, set[str]] = {
+    SubscriptionStatus.ACTIVE: {SubscriptionStatus.PAST_DUE, SubscriptionStatus.CANCELED, SubscriptionStatus.PAUSED, SubscriptionStatus.UNPAID},
+    SubscriptionStatus.TRIALING: {SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE, SubscriptionStatus.CANCELED, SubscriptionStatus.PAUSED},
+    SubscriptionStatus.PAST_DUE: {SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELED, SubscriptionStatus.UNPAID},
+    SubscriptionStatus.PAUSED: {SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELED},
+    SubscriptionStatus.INCOMPLETE: {SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.INCOMPLETE_EXPIRED, SubscriptionStatus.CANCELED},
+    SubscriptionStatus.INCOMPLETE_EXPIRED: set(),
+    SubscriptionStatus.UNPAID: {SubscriptionStatus.CANCELED},
+    SubscriptionStatus.CANCELED: set(),
+}
+
+
 class Subscription(models.Model):
     customer = models.ForeignKey("accounts.Customer", on_delete=models.PROTECT, related_name="subscriptions")
 
     stripe_subscription_id = models.CharField(max_length=255, unique=True, db_index=True)
-    stripe_price_id = models.CharField(max_length=255, db_index=True, help_text="Current price ID from Stripe")
-    status = models.CharField(max_length=20, choices=SubscriptionStatus.choices, db_index=True)
+    stripe_price_id = models.CharField(max_length=255, db_index=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=SubscriptionStatus.choices,
+        default=SubscriptionStatus.INCOMPLETE,
+        db_index=True,
+    )
 
     current_period_start = models.DateTimeField()
     current_period_end = models.DateTimeField(db_index=True)
@@ -27,6 +50,9 @@ class Subscription(models.Model):
 
     trial_start = models.DateTimeField(null=True, blank=True)
     trial_end = models.DateTimeField(null=True, blank=True)
+
+    paused_at = models.DateTimeField(null=True, blank=True)
+    resumed_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -45,5 +71,21 @@ class Subscription(models.Model):
         return self.status in (
             SubscriptionStatus.ACTIVE,
             SubscriptionStatus.TRIALING,
-            SubscriptionStatus.PAST_DUE,  # Grace period
+            SubscriptionStatus.PAST_DUE,
         )
+
+    def cancel(self):
+        self.apply_new_status(SubscriptionStatus.CANCELED)
+        self.canceled_at = timezone.now()
+        self.save(update_fields=["status", "canceled_at", "updated_at"])
+
+    def pause(self):
+        self.apply_new_status(SubscriptionStatus.PAUSED)
+        self.paused_at = timezone.now()
+        self.save(update_fields=["status", "paused_at", "updated_at"])
+
+    def apply_new_status(self, new_status: str):
+        if new_status not in EXPECTED_TRANSITIONS.get(self.status, set()):
+            log.warning(f"Unexpected transition {self.status} → {new_status} for {self.stripe_subscription_id}")
+        self.status = new_status
+
